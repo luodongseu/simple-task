@@ -6,7 +6,7 @@ import lombok.Setter;
 import java.util.Date;
 
 /**
- * 任务请求的请求体
+ * 任务执行日志请求的请求体
  *
  * @author luodongseu
  */
