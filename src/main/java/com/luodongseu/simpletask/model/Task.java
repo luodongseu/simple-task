@@ -23,6 +23,7 @@ public class Task extends NoteBase {
     /**
      * 任务创建者，一般是创建人的ID
      */
+    @Column(nullable = false)
     private String creator;
 
     /**
@@ -60,11 +61,12 @@ public class Task extends NoteBase {
     /**
      * 任务状态(未开始，进行中，已结束，已取消，已失效)
      */
+    @Column(nullable = false)
     private StatusEnum status;
 
     /**
      * 创建任务的时间戳，毫秒单位
      */
-    @Column(length = 11)
-    private long createTime;
+    @Column(length = 13)
+    private long createTime = System.currentTimeMillis();
 }

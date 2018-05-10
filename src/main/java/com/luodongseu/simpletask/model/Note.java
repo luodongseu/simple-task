@@ -27,6 +27,7 @@ public class Note {
     /**
      * 属主ID
      */
+    @Column(nullable = false)
     private String subjectId;
 
     /**
@@ -34,6 +35,6 @@ public class Note {
      */
     private String note;
 
-    @Temporal(TemporalType.TIMESTAMP)
-    private long createTime;
+    @Column(length = 13)
+    private long createTime = System.currentTimeMillis();
 }

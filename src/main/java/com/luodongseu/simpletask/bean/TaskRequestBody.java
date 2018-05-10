@@ -16,6 +16,7 @@ public class TaskRequestBody {
     private String creator;
     private String description;
     private String detail;
+    private String execution;
     private String category;
     private Date startDate;
     private Date endDate;

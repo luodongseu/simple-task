@@ -1,11 +1,10 @@
 package com.luodongseu.simpletask.model;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.util.StringUtils;
 
-import javax.persistence.FetchType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.OneToMany;
+import javax.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +13,10 @@ import java.util.List;
  *
  * @author luodongseu
  */
+@Setter
+@Getter
+@Entity
+@Inheritance(strategy = InheritanceType.JOINED)
 public class NoteBase {
 
     @Id
@@ -22,8 +25,8 @@ public class NoteBase {
     /**
      * 备注信息, 以 subject_id 作为外键
      */
-    @OneToMany(fetch = FetchType.LAZY)
-    @JoinColumn(name = "subject_id")
+    @OneToMany(fetch = FetchType.LAZY, cascade = {CascadeType.ALL})
+    @JoinColumn(name = "subjectId")
     private List<Note> notes = new ArrayList<>();
 
     /**

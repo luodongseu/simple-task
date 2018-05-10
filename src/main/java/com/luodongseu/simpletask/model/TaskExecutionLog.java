@@ -23,7 +23,7 @@ public class TaskExecutionLog extends NoteBase {
     /**
      * 任务认领信息，以 task_claim_id 作为外键
      */
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST})
     @JoinColumn(name = "task_claim_id")
     private TaskClaim taskClaim;
 
@@ -42,10 +42,18 @@ public class TaskExecutionLog extends NoteBase {
     /**
      * 执行的记录日志，第三方可以在该字段放任何数据，以字符串存储
      */
-    private Object log;
+    @Lob
+    private String log;
 
     /**
      * 任务执行状态： 进行中，已完成
      */
+    @Column(nullable = false)
     private StatusEnum status;
+
+    /**
+     * 创建任务的时间戳，毫秒单位
+     */
+    @Column(length = 13)
+    private long createTime = System.currentTimeMillis();
 }
