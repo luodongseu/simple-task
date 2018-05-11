@@ -21,8 +21,7 @@ public class Note {
      * ID自增长
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private long id;
+    private String id;
 
     /**
      * 属主ID

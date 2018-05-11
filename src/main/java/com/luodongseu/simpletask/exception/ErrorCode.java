@@ -6,7 +6,8 @@ package com.luodongseu.simpletask.exception;
  * @author luodongseu
  */
 public class ErrorCode {
-    public static final int PARAMETER_ERROR = 401;
-    public static final int UNKNOWN_ERROR = 404;
-    public static final int REQUEST_INVALID = 400;
+    public static final int PARAMETER_ERROR = 4005;
+    public static final int UNKNOWN_ERROR = 4004;
+    public static final int REQUEST_INVALID = 4000;
+    public static final int INTERNAL_ERROR = 5000;
 }

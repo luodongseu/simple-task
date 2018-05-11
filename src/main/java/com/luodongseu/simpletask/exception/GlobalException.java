@@ -11,7 +11,7 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-@JsonIgnoreProperties({"cause", "stackTrace", "localizedMessage", "suppressed"})
+@JsonIgnoreProperties({"cause", "stackTrace", "localizedMessage", "suppressed", "e"})
 public class GlobalException extends RuntimeException {
 
     /**
@@ -29,18 +29,24 @@ public class GlobalException extends RuntimeException {
      */
     private Object data;
 
-    public GlobalException(int errorCode) {
-        this(errorCode, "");
+    /**
+     * 异常对象
+     */
+    private Exception e;
+
+    public GlobalException(int errorCode, Exception e) {
+        this(errorCode, e.getMessage(), e);
     }
 
-    public GlobalException(int errorCode, String message) {
-        this(errorCode, message, null);
+    public GlobalException(int errorCode, String message, Exception e) {
+        this(errorCode, message, null, e);
     }
 
-    public GlobalException(int errorCode, String message, Object data) {
+    public GlobalException(int errorCode, String message, Object data, Exception e) {
         this.errorCode = errorCode;
         this.message = message;
         this.data = data;
+        this.e = e;
     }
 
 }

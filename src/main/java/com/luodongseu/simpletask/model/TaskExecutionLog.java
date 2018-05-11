@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 任务执行日志
@@ -15,7 +17,7 @@ import javax.persistence.*;
 @Setter
 @Entity
 @Table(name = "t_simple_task_execution_log")
-public class TaskExecutionLog extends NoteBase {
+public class TaskExecutionLog {
 
     @Id
     private String id;
@@ -56,4 +58,11 @@ public class TaskExecutionLog extends NoteBase {
      */
     @Column(length = 13)
     private long createTime = System.currentTimeMillis();
+
+    /**
+     * 备注信息, 以 subject_id 作为外键
+     */
+    @OneToMany(fetch = FetchType.LAZY, cascade = {CascadeType.ALL})
+    @JoinColumn(name = "subjectId")
+    private List<Note> notes = new ArrayList<>();
 }

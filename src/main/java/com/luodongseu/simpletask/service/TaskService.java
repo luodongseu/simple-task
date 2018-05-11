@@ -1,11 +1,10 @@
 package com.luodongseu.simpletask.service;
 
-import com.luodongseu.simpletask.bean.ExecutionLogRequestBody;
-import com.luodongseu.simpletask.bean.TaskRequestBody;
+import com.luodongseu.simpletask.bean.ExecutionLogRequest;
+import com.luodongseu.simpletask.bean.TaskRequest;
+import com.luodongseu.simpletask.bean.TaskRewardTemplateRequest;
 import com.luodongseu.simpletask.enums.ClaimCategoryEnum;
-import com.luodongseu.simpletask.model.Task;
-import com.luodongseu.simpletask.model.TaskClaim;
-import com.luodongseu.simpletask.model.TaskExecutionLog;
+import com.luodongseu.simpletask.model.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -23,6 +22,23 @@ import java.util.List;
 public interface TaskService {
 
     /**
+     * 创建一个新的奖励模板
+     *
+     * @param rewardBody 奖励模板信息
+     * @return 模板ID
+     */
+    String createNewRewardTemplate(@NotNull TaskRewardTemplateRequest rewardBody);
+
+    /**
+     * 查询所有的奖励模板
+     *
+     * @param specifications 查询条件
+     * @param pageable       页码
+     * @return Page<TaskRewardTemplate>
+     */
+    Page<TaskRewardTemplate> queryAllRewardTemplate(@Nullable List<Specification<TaskRewardTemplate>> specifications, @Nullable Pageable pageable);
+
+    /**
      * 保存Task内容
      *
      * @param task Task对象
@@ -35,7 +51,7 @@ public interface TaskService {
      * @param task 任务信息
      * @return 任务ID
      */
-    String createNewTask(@NotNull TaskRequestBody task);
+    String createNewTask(@NotNull TaskRequest task);
 
     /**
      * 查询所有任务
@@ -60,7 +76,7 @@ public interface TaskService {
      * @param task   更新后的任务信息
      * @return true:更新成功 false:更新失败
      */
-    boolean updateTask(@NotNull String taskId, @NotNull TaskRequestBody task);
+    boolean updateTask(@NotNull String taskId, @NotNull TaskRequest task);
 
     /**
      * 开始一个任务
@@ -97,6 +113,34 @@ public interface TaskService {
      * @return true:删除成功 false:删除失败
      */
     boolean deleteTask(@NotNull String taskId);
+
+
+    /**
+     * 给指定的任务添加白名单
+     *
+     * @param taskId    任务ID
+     * @param whiteList 白名单
+     * @return true:添加成功 false:添加失败
+     */
+    boolean addTaskWhiteList(@NotNull String taskId, String[] whiteList);
+
+    /**
+     * 查询所有的白名单
+     *
+     * @param specifications 查询条件
+     * @param pageable       页码
+     * @return Page<TaskWhiteList>
+     */
+    Page<TaskWhiteList> queryAllTaskWhiteList(@Nullable List<Specification<TaskWhiteList>> specifications, @Nullable Pageable pageable);
+
+    /**
+     * 从白名单中移除指定的元数据
+     *
+     * @param taskId    任务ID
+     * @param whiteMeta 元数据
+     * @return true:移除成功 false:移除失败
+     */
+    boolean removeTaskWhiteList(@NotNull String taskId, @NotNull String whiteMeta);
 
     /**
      * 认领一个任务， 认领后会在任务的备注表中添加相应的认领记录
@@ -140,7 +184,7 @@ public interface TaskService {
      * @param logRequestBody 日志的请求体
      * @return 日志的ID
      */
-    String addExecutionLog(@NotNull ExecutionLogRequestBody logRequestBody);
+    String addExecutionLog(@NotNull ExecutionLogRequest logRequestBody);
 
     /**
      * 保存一个任务执行日志对象

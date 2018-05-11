@@ -19,24 +19,24 @@ public class GlobalExceptionHandler {
 
     @ResponseBody
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    @ExceptionHandler(Exception.class)
+    @ExceptionHandler({Exception.class})
     public GlobalException handleException(Exception e) {
         log.error("Unknown exception: ", e);
-        return new GlobalException(ErrorCode.UNKNOWN_ERROR, e.getMessage());
+        return new GlobalException(ErrorCode.UNKNOWN_ERROR, e);
     }
 
     @ResponseBody
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    @ExceptionHandler(NullPointerException.class)
+    @ExceptionHandler({NullPointerException.class})
     public GlobalException handleNull(NullPointerException e) {
         log.error("NullPointerException exception: ", e);
         return new GlobalException(ErrorCode.REQUEST_INVALID,
-                StringUtils.isEmpty(e.getMessage()) ? e.getMessage() : "不允许的空值");
+                !StringUtils.isEmpty(e.getMessage()) ? e.getMessage() : "不允许的空值", e);
     }
 
     @ResponseBody
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    @ExceptionHandler(NullPointerException.class)
+    @ExceptionHandler({GlobalException.class})
     public GlobalException handleNull(GlobalException e) {
         log.error("GlobalException exception: ", e);
         return e;

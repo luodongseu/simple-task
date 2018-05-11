@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 任务详情表
@@ -15,7 +17,7 @@ import javax.persistence.*;
 @Setter
 @Entity
 @Table(name = "t_simple_task")
-public class Task extends NoteBase {
+public class Task {
 
     @Id
     private String id;
@@ -59,6 +61,13 @@ public class Task extends NoteBase {
     private String category;
 
     /**
+     * 任务奖励模板
+     */
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "reward_template_id")
+    private TaskRewardTemplate rewardTemplate;
+
+    /**
      * 任务状态(未开始，进行中，已结束，已取消，已失效)
      */
     @Column(nullable = false)
@@ -69,4 +78,11 @@ public class Task extends NoteBase {
      */
     @Column(length = 13)
     private long createTime = System.currentTimeMillis();
+
+    /**
+     * 备注信息, 以 subject_id 作为外键
+     */
+    @OneToMany(fetch = FetchType.LAZY, cascade = {CascadeType.ALL})
+    @JoinColumn(name = "subjectId")
+    private List<Note> notes = new ArrayList<>();
 }

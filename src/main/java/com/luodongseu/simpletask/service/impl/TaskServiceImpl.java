@@ -1,16 +1,19 @@
 package com.luodongseu.simpletask.service.impl;
 
-import com.luodongseu.simpletask.bean.ExecutionLogRequestBody;
-import com.luodongseu.simpletask.bean.TaskRequestBody;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.luodongseu.simpletask.bean.ExecutionLogRequest;
+import com.luodongseu.simpletask.bean.TaskRequest;
+import com.luodongseu.simpletask.bean.TaskRewardTemplateRequest;
 import com.luodongseu.simpletask.enums.ClaimCategoryEnum;
 import com.luodongseu.simpletask.enums.StatusEnum;
-import com.luodongseu.simpletask.model.Task;
-import com.luodongseu.simpletask.model.TaskClaim;
-import com.luodongseu.simpletask.model.TaskExecutionLog;
-import com.luodongseu.simpletask.repository.TaskClaimRepository;
-import com.luodongseu.simpletask.repository.TaskExecutionLogRepository;
-import com.luodongseu.simpletask.repository.TaskRepository;
+import com.luodongseu.simpletask.exception.ErrorCode;
+import com.luodongseu.simpletask.exception.GlobalException;
+import com.luodongseu.simpletask.model.*;
+import com.luodongseu.simpletask.repository.*;
 import com.luodongseu.simpletask.service.TaskService;
+import com.luodongseu.simpletask.utils.NoteUtils;
+import com.luodongseu.simpletask.utils.ObjectUtils;
 import com.luodongseu.simpletask.utils.SpecificationUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,14 +23,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Root;
 import javax.validation.constraints.NotNull;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 
 /**
@@ -37,15 +39,47 @@ import java.util.UUID;
 @Service
 public class TaskServiceImpl implements TaskService {
 
+    private static ObjectMapper JSON_MAPPER = new ObjectMapper();
+
     private final TaskRepository taskRepository;
     private final TaskClaimRepository taskClaimRepository;
     private final TaskExecutionLogRepository taskExecutionLogRepository;
+    private final TaskRewardTemplateRepository rewardTemplateRepository;
+    private final TaskWhiteListRepository whiteListRepository;
 
     @Autowired
-    public TaskServiceImpl(TaskRepository taskRepository, TaskClaimRepository taskClaimRepository, TaskExecutionLogRepository taskExecutionLogRepository) {
+    public TaskServiceImpl(TaskRepository taskRepository,
+                           TaskClaimRepository taskClaimRepository,
+                           TaskExecutionLogRepository taskExecutionLogRepository,
+                           TaskRewardTemplateRepository rewardTemplateRepository,
+                           TaskWhiteListRepository whiteListRepository) {
         this.taskRepository = taskRepository;
         this.taskClaimRepository = taskClaimRepository;
         this.taskExecutionLogRepository = taskExecutionLogRepository;
+        this.rewardTemplateRepository = rewardTemplateRepository;
+        this.whiteListRepository = whiteListRepository;
+    }
+
+    @Override
+    public String createNewRewardTemplate(@NotNull TaskRewardTemplateRequest rewardBody) {
+        ObjectUtils.requireNonEmpty(rewardBody.getCreator(), "模板创建者不能为空");
+        ObjectUtils.requireNonEmpty(rewardBody.getMeta(), "模板元数据不能为空");
+
+        TaskRewardTemplate newRewardTemplate = new TaskRewardTemplate();
+        newRewardTemplate.setId(UUID.randomUUID().toString());
+        newRewardTemplate.setCreator(rewardBody.getCreator());
+        try {
+            newRewardTemplate.setDescription(JSON_MAPPER.writeValueAsString(rewardBody.getMeta()));
+        } catch (JsonProcessingException e) {
+            throw new GlobalException(ErrorCode.INTERNAL_ERROR, "解析Json数据异常", e);
+        }
+        newRewardTemplate.setType(rewardBody.getType());
+        return rewardTemplateRepository.save(newRewardTemplate).getId();
+    }
+
+    @Override
+    public Page<TaskRewardTemplate> queryAllRewardTemplate(List<Specification<TaskRewardTemplate>> specifications, Pageable pageable) {
+        return SpecificationUtils.getPageData(rewardTemplateRepository, specifications, pageable);
     }
 
     @Override
@@ -55,19 +89,26 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public String createNewTask(TaskRequestBody task) {
-        Objects.requireNonNull(task.getCreator(), "任务创建者不能为空");
-        assert !StringUtils.isEmpty(task.getDescription()) || !StringUtils.isEmpty(task.getDetail());
+    public String createNewTask(TaskRequest task) {
+        ObjectUtils.requireNonEmpty(task, Objects::isNull, "任务内容不能为空");
+        ObjectUtils.requireNonEmpty(task.getCreator(), "任务创建者不能为空");
+        if (StringUtils.isEmpty(task.getDescription()) && StringUtils.isEmpty(task.getDetail())) {
+            ObjectUtils.requireNonEmpty(task.getDescription(), "任务描述信息不能为空");
+        }
 
-        Assert.hasText(task.getCreator(), "任务创建者不能为空");
-
+        TaskRewardTemplate rewardTemplate = StringUtils.isEmpty(task.getRewardTemplateId()) ?
+                null :
+                findRewardTemplateById(task.getRewardTemplateId());
         Task newTask = new Task();
         String taskId = UUID.randomUUID().toString();
         newTask.setId(taskId);
         newTask.setStatus(Objects.requireNonNull(task.getStartDate()).getTime() > System.currentTimeMillis() ? StatusEnum.NOT_READY : StatusEnum.IN_PROGRESS);
         newTask.setCreateTime(System.currentTimeMillis());
+        newTask.setStartTime(task.getStartDate().getTime());
+        newTask.setEndTime(task.getEndDate() != null ? task.getEndDate().getTime() : 0);
+        newTask.setRewardTemplate(rewardTemplate);
         BeanUtils.copyProperties(task, newTask);
-        newTask.addNote("[System note] New task");
+        newTask.setNotes(NoteUtils.addNote(newTask.getNotes(), "[System note] New task", taskId));
         taskRepository.save(newTask);
         return taskId;
     }
@@ -90,8 +131,10 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public boolean updateTask(String taskId, TaskRequestBody task) {
-        assert !StringUtils.isEmpty(taskId);
+    public boolean updateTask(String taskId, TaskRequest task) {
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+        ObjectUtils.requireNonEmpty(task, Objects::isNull, "新的任务内容不能为空");
+
         Task oldTask = findTaskById(taskId);
         if (null != oldTask) {
             BeanUtils.copyProperties(task, oldTask);
@@ -102,12 +145,13 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public boolean startTask(@NotNull String taskId, String note) {
-        assert !StringUtils.isEmpty(taskId);
+    public boolean startTask(String taskId, String note) {
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
         Task oldTask = findTaskById(taskId);
         if (null != oldTask) {
             oldTask.setStatus(StatusEnum.IN_PROGRESS);
-            oldTask.addNote(note);
+            oldTask.setNotes(NoteUtils.addNote(oldTask.getNotes(), note, taskId));
             taskRepository.save(oldTask);
             return true;
         }
@@ -116,11 +160,12 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public boolean cancelTask(String taskId, String note) {
-        assert !StringUtils.isEmpty(taskId);
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
         Task oldTask = findTaskById(taskId);
         if (null != oldTask) {
             oldTask.setStatus(StatusEnum.CANCELED);
-            oldTask.addNote(note);
+            oldTask.setNotes(NoteUtils.addNote(oldTask.getNotes(), note, taskId));
             taskRepository.save(oldTask);
             return true;
         }
@@ -129,11 +174,12 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public boolean endTask(String taskId, String note) {
-        assert !StringUtils.isEmpty(taskId);
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
         Task oldTask = findTaskById(taskId);
         if (null != oldTask) {
             oldTask.setStatus(StatusEnum.END);
-            oldTask.addNote(note);
+            oldTask.setNotes(NoteUtils.addNote(oldTask.getNotes(), note, taskId));
             taskRepository.save(oldTask);
             return true;
         }
@@ -142,7 +188,8 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public boolean deleteTask(String taskId) {
-        assert !StringUtils.isEmpty(taskId);
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
         Task oldTask = findTaskById(taskId);
         if (null != oldTask) {
             taskRepository.delete(oldTask);
@@ -151,12 +198,58 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
+    public boolean addTaskWhiteList(String taskId, String[] whiteList) {
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
+        Task oldTask = findTaskById(taskId);
+        if (null == oldTask || null == whiteList || whiteList.length == 0) {
+            return false;
+        }
+        List<TaskWhiteList> toSaveWhiteList = new ArrayList<>();
+        Arrays.stream(whiteList).forEach(s -> {
+            if (!StringUtils.isEmpty(s)) {
+                TaskWhiteList newWhiteList = new TaskWhiteList();
+                newWhiteList.setId(UUID.randomUUID().toString());
+                newWhiteList.setTask(oldTask);
+                newWhiteList.setClaimer(s);
+                toSaveWhiteList.add(newWhiteList);
+            }
+        });
+        whiteListRepository.saveAll(toSaveWhiteList);
+        return true;
+    }
+
+    @Override
+    public Page<TaskWhiteList> queryAllTaskWhiteList(List<Specification<TaskWhiteList>> specifications, Pageable pageable) {
+        return SpecificationUtils.getPageData(whiteListRepository, specifications, pageable);
+    }
+
+    @Override
+    public boolean removeTaskWhiteList(String taskId, String whiteMeta) {
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+        ObjectUtils.requireNonEmpty(whiteMeta, "白名单名单不能为空");
+
+        Specification<TaskWhiteList> specifications = (Root<TaskWhiteList> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) ->
+                criteriaBuilder.and(criteriaBuilder.equal(root.get(TaskWhiteList_.taskId), taskId),
+                        criteriaBuilder.equal(root.get(TaskWhiteList_.claimer), whiteMeta));
+        Page<TaskWhiteList> whiteLists = SpecificationUtils.getPageData(whiteListRepository, Collections.singletonList(specifications), null);
+        if (whiteLists.getTotalElements() == 0) {
+            return false;
+        }
+        whiteListRepository.deleteAll(whiteLists.getContent());
+        return true;
+    }
+
+    @Override
     public String claimTask(String taskId, String claimer, ClaimCategoryEnum category) {
-        assert !StringUtils.isEmpty(taskId);
-        assert !StringUtils.isEmpty(claimer);
-        assert null != category;
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+        ObjectUtils.requireNonEmpty(claimer, "认领者不能为空");
+        ObjectUtils.requireNonEmpty(category, Objects::isNull, "认领者不能为空");
+
         Task task = findTaskById(taskId);
-        assert null != task;
+        if (null == task) {
+            throw new GlobalException(ErrorCode.PARAMETER_ERROR, "没有找到指定的任务信息", null);
+        }
         TaskClaim newClaim = new TaskClaim();
         String claimId = UUID.randomUUID().toString();
         newClaim.setId(claimId);
@@ -164,21 +257,23 @@ public class TaskServiceImpl implements TaskService {
         newClaim.setClaimer(claimer);
         newClaim.setStatus(StatusEnum.IN_PROGRESS);
         newClaim.setTask(task);
-        newClaim.addNote("[System note] New claim");
-        taskClaimRepository.save(newClaim);
-        return claimId;
+        newClaim.setNotes(NoteUtils.addNote(newClaim.getNotes(), "[System note] New claim", claimId));
+        return taskClaimRepository.save(newClaim).getId();
     }
 
     @Override
     public void saveTaskClaim(TaskClaim taskClaim) {
-        assert null != taskClaim;
-        assert !StringUtils.isEmpty(taskClaim.getId());
+        ObjectUtils.requireNonEmpty(taskClaim, Objects::isNull, "认领内容不能为空");
+        ObjectUtils.requireNonEmpty(taskClaim.getId(), "认领ID不能为空");
+        ObjectUtils.requireNonEmpty(taskClaim.getClaimer(), "认领者不能为空");
+
         taskClaimRepository.save(taskClaim);
     }
 
     @Override
     public boolean updateClaimProgress(String taskClaimId, String newProgress, boolean completed) {
-        assert !StringUtils.isEmpty(taskClaimId);
+        ObjectUtils.requireNonEmpty(taskClaimId, "认领ID不能为空");
+
         if (newProgress == null) {
             newProgress = "";
         }
@@ -200,15 +295,18 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public String addExecutionLog(ExecutionLogRequestBody logRequestBody) {
-        assert null != logRequestBody;
-        assert !StringUtils.isEmpty(logRequestBody.getTaskClaimId());
+    public String addExecutionLog(ExecutionLogRequest logRequestBody) {
+        ObjectUtils.requireNonEmpty(logRequestBody, Objects::isNull, "执行内容不能为空");
+        ObjectUtils.requireNonEmpty(logRequestBody.getTaskClaimId(), "认领ID不能为空");
+
         TaskClaim taskClaim = findTaskClaimById(logRequestBody.getTaskClaimId());
-        assert null != taskClaim;
+        if (null == taskClaim) {
+            throw new GlobalException(ErrorCode.PARAMETER_ERROR, "没有找到指定的认领信息", null);
+        }
 
         TaskExecutionLog executionLog = new TaskExecutionLog();
-        String id = UUID.randomUUID().toString();
-        executionLog.setId(id);
+        String executionLogId = UUID.randomUUID().toString();
+        executionLog.setId(executionLogId);
         executionLog.setLog(logRequestBody.getLog());
         if (null != logRequestBody.getStartDate()) {
             executionLog.setStartTime(logRequestBody.getStartDate().getTime());
@@ -218,13 +316,14 @@ public class TaskServiceImpl implements TaskService {
         }
         executionLog.setStatus(logRequestBody.isComplete() ? StatusEnum.COMPLETE : StatusEnum.IN_PROGRESS);
         executionLog.setTaskClaim(taskClaim);
-        executionLog.addNote("[System note] New log");
+        executionLog.setNotes(NoteUtils.addNote(executionLog.getNotes(), "[System note] New log", executionLogId));
         return null;
     }
 
     @Override
     public void saveExecutionLog(TaskExecutionLog executionLog) {
-        assert null != executionLog;
+        ObjectUtils.requireNonEmpty(executionLog, Objects::isNull, "执行内容不能为空");
+
         taskExecutionLogRepository.save(executionLog);
     }
 
@@ -252,6 +351,17 @@ public class TaskServiceImpl implements TaskService {
      */
     private TaskClaim findTaskClaimById(String taskClaimId) {
         Optional<TaskClaim> optionalTask = taskClaimRepository.findById(taskClaimId);
+        return optionalTask.orElse(null);
+    }
+
+    /**
+     * 通过rewardTemplateId查询TaskRewardTemplate对象
+     *
+     * @param rewardTemplateId TaskRewardTemplate ID
+     * @return TaskRewardTemplate
+     */
+    private TaskRewardTemplate findRewardTemplateById(String rewardTemplateId) {
+        Optional<TaskRewardTemplate> optionalTask = rewardTemplateRepository.findById(rewardTemplateId);
         return optionalTask.orElse(null);
     }
 }

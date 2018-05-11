@@ -6,18 +6,20 @@ import lombok.Setter;
 import java.util.Date;
 
 /**
- * 任务请求的请求体
+ * 任务执行日志请求的请求体
  *
  * @author luodongseu
  */
 @Getter
 @Setter
-public class TaskRequestBody {
-    private String creator;
-    private String description;
-    private String detail;
-    private String execution;
-    private String category;
+public class ExecutionLogRequest {
+    private String taskClaimId;
+    private String log;
+    private String note;
     private Date startDate;
     private Date endDate;
+    /**
+     * 是否完成
+     */
+    private boolean complete;
 }

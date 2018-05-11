@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 任务认领记录表
@@ -16,7 +18,11 @@ import javax.persistence.*;
 @Getter
 @Entity
 @Table(name = "t_simple_task_claim")
-public class TaskClaim extends NoteBase {
+public class TaskClaim {
+
+    @Id
+    private String id;
+
     /**
      * 任务详情的ID
      */
@@ -51,4 +57,11 @@ public class TaskClaim extends NoteBase {
      */
     @Column(length = 13)
     private long createTime = System.currentTimeMillis();
+
+    /**
+     * 备注信息, 以 subject_id 作为外键
+     */
+    @OneToMany(fetch = FetchType.LAZY, cascade = {CascadeType.ALL})
+    @JoinColumn(name = "subjectId")
+    private List<Note> notes = new ArrayList<>();
 }
