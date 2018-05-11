@@ -45,7 +45,7 @@ public class TaskExecutionLog {
      * 执行的记录日志，第三方可以在该字段放任何数据，以字符串存储
      */
     @Lob
-    private String log;
+    private String meta;
 
     /**
      * 任务执行状态： 进行中，已完成

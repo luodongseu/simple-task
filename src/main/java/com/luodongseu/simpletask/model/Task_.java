@@ -12,6 +12,7 @@ import javax.persistence.metamodel.StaticMetamodel;
  */
 @StaticMetamodel(Task.class)
 public class Task_ {
+    public static volatile SingularAttribute<Task, String> creator;
     public static volatile SingularAttribute<Task, Long> startTime;
     public static volatile SingularAttribute<Task, Long> endTime;
     public static volatile SingularAttribute<Task, StatusEnum> status;

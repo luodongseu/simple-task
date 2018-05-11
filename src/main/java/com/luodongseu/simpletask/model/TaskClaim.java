@@ -42,9 +42,9 @@ public class TaskClaim {
     private ClaimCategoryEnum category;
 
     /**
-     * 任务认领完成的进度描述
+     * 自定义的属性
      */
-    private String progress;
+    private String meta;
 
     /**
      * 任务认领状态： 进行中，已完成，失效

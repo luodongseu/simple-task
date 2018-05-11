@@ -32,4 +32,10 @@ public class TaskWhiteList {
      * 认领者
      */
     private String claimer;
+
+    /**
+     * 创建任务的时间戳，毫秒单位
+     */
+    @Column(length = 13)
+    private long createTime = System.currentTimeMillis();
 }

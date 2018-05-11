@@ -1,10 +1,6 @@
 package com.luodongseu.simpletask.service.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.luodongseu.simpletask.bean.ExecutionLogRequest;
-import com.luodongseu.simpletask.bean.TaskRequest;
-import com.luodongseu.simpletask.bean.TaskRewardTemplateRequest;
+import com.luodongseu.simpletask.bean.*;
 import com.luodongseu.simpletask.enums.ClaimCategoryEnum;
 import com.luodongseu.simpletask.enums.StatusEnum;
 import com.luodongseu.simpletask.exception.ErrorCode;
@@ -12,9 +8,11 @@ import com.luodongseu.simpletask.exception.GlobalException;
 import com.luodongseu.simpletask.model.*;
 import com.luodongseu.simpletask.repository.*;
 import com.luodongseu.simpletask.service.TaskService;
+import com.luodongseu.simpletask.utils.ModelUtils;
 import com.luodongseu.simpletask.utils.NoteUtils;
 import com.luodongseu.simpletask.utils.ObjectUtils;
 import com.luodongseu.simpletask.utils.SpecificationUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -35,11 +33,10 @@ import java.util.*;
 /**
  * @author luodongseu
  */
+@Slf4j
 @Transactional(rollbackFor = Exception.class)
 @Service
 public class TaskServiceImpl implements TaskService {
-
-    private static ObjectMapper JSON_MAPPER = new ObjectMapper();
 
     private final TaskRepository taskRepository;
     private final TaskClaimRepository taskClaimRepository;
@@ -68,18 +65,16 @@ public class TaskServiceImpl implements TaskService {
         TaskRewardTemplate newRewardTemplate = new TaskRewardTemplate();
         newRewardTemplate.setId(UUID.randomUUID().toString());
         newRewardTemplate.setCreator(rewardBody.getCreator());
-        try {
-            newRewardTemplate.setDescription(JSON_MAPPER.writeValueAsString(rewardBody.getMeta()));
-        } catch (JsonProcessingException e) {
-            throw new GlobalException(ErrorCode.INTERNAL_ERROR, "解析Json数据异常", e);
-        }
+        newRewardTemplate.setDescription(ModelUtils.writeValueAsString(rewardBody.getMeta()));
         newRewardTemplate.setType(rewardBody.getType());
         return rewardTemplateRepository.save(newRewardTemplate).getId();
     }
 
     @Override
-    public Page<TaskRewardTemplate> queryAllRewardTemplate(List<Specification<TaskRewardTemplate>> specifications, Pageable pageable) {
-        return SpecificationUtils.getPageData(rewardTemplateRepository, specifications, pageable);
+    public Page<TaskRewardTemplateResponse> queryAllRewardTemplate(List<Specification<TaskRewardTemplate>> specifications, Pageable pageable) {
+        Page<TaskRewardTemplate> taskRewardTemplates = SpecificationUtils.getPageData(rewardTemplateRepository, specifications, pageable);
+        return new PageImpl<>(ModelUtils.convertToRewardResponse(taskRewardTemplates.getContent()),
+                pageable, taskRewardTemplates.getTotalElements());
     }
 
     @Override
@@ -92,9 +87,8 @@ public class TaskServiceImpl implements TaskService {
     public String createNewTask(TaskRequest task) {
         ObjectUtils.requireNonEmpty(task, Objects::isNull, "任务内容不能为空");
         ObjectUtils.requireNonEmpty(task.getCreator(), "任务创建者不能为空");
-        if (StringUtils.isEmpty(task.getDescription()) && StringUtils.isEmpty(task.getDetail())) {
-            ObjectUtils.requireNonEmpty(task.getDescription(), "任务描述信息不能为空");
-        }
+        ObjectUtils.requireNonEmpty(task.getDescription(), "任务描述信息不能为空");
+        Objects.requireNonNull(task.getStartDate(), "任务起始时间不能为空");
 
         TaskRewardTemplate rewardTemplate = StringUtils.isEmpty(task.getRewardTemplateId()) ?
                 null :
@@ -102,11 +96,12 @@ public class TaskServiceImpl implements TaskService {
         Task newTask = new Task();
         String taskId = UUID.randomUUID().toString();
         newTask.setId(taskId);
-        newTask.setStatus(Objects.requireNonNull(task.getStartDate()).getTime() > System.currentTimeMillis() ? StatusEnum.NOT_READY : StatusEnum.IN_PROGRESS);
+        newTask.setStatus(task.getStartDate().getTime() > System.currentTimeMillis() ? StatusEnum.NOT_READY : StatusEnum.IN_PROGRESS);
         newTask.setCreateTime(System.currentTimeMillis());
         newTask.setStartTime(task.getStartDate().getTime());
         newTask.setEndTime(task.getEndDate() != null ? task.getEndDate().getTime() : 0);
         newTask.setRewardTemplate(rewardTemplate);
+        newTask.setMeta(ModelUtils.writeValueAsString(task.getMeta()));
         BeanUtils.copyProperties(task, newTask);
         newTask.setNotes(NoteUtils.addNote(newTask.getNotes(), "[System note] New task", taskId));
         taskRepository.save(newTask);
@@ -114,20 +109,25 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public Page<Task> queryAllTask(Pageable pageable) {
+    public Page<TaskResponse> queryAllTask(Pageable pageable) {
         if (null == pageable) {
-            List<Task> allTasks = taskRepository.findAll();
-            return new PageImpl<>(allTasks);
+            return new PageImpl<>(ModelUtils.convertToTaskResponse(taskRepository.findAll()));
         }
-        assert pageable.getOffset() >= 0;
-        assert pageable.getPageSize() > 0;
-        return taskRepository.findAll(pageable);
+        Page<Task> allTasks = taskRepository.findAll(pageable);
+        return new PageImpl<>(ModelUtils.convertToTaskResponse(allTasks.getContent()), pageable, allTasks.getTotalElements());
     }
 
     @Override
-    public Page<Task> queryAllTask(List<Specification<Task>> specifications, Pageable pageable) {
-        assert specifications != null;
-        return SpecificationUtils.getPageData(taskRepository, specifications, pageable);
+    public Page<TaskResponse> queryAllTask(List<Specification<Task>> specifications, Pageable pageable) {
+        Page<Task> taskPage = SpecificationUtils.getPageData(taskRepository, specifications, pageable);
+        if (null != pageable) {
+            return new PageImpl<>(
+                    ModelUtils.convertToTaskResponse(
+                            taskPage.getContent()), pageable, taskPage.getTotalElements());
+        }
+        return new PageImpl<>(
+                ModelUtils.convertToTaskResponse(
+                        taskPage.getContent()));
     }
 
     @Override
@@ -271,15 +271,15 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public boolean updateClaimProgress(String taskClaimId, String newProgress, boolean completed) {
+    public boolean updateClaimProgress(String taskClaimId, Map<String, Object> newMeta, boolean completed) {
         ObjectUtils.requireNonEmpty(taskClaimId, "认领ID不能为空");
 
-        if (newProgress == null) {
-            newProgress = "";
+        if (newMeta == null) {
+            return false;
         }
         TaskClaim oldTaskClaim = findTaskClaimById(taskClaimId);
         if (null != oldTaskClaim) {
-            oldTaskClaim.setProgress(newProgress);
+            oldTaskClaim.setMeta(ModelUtils.writeValueAsString(newMeta));
             if (completed) {
                 oldTaskClaim.setStatus(StatusEnum.COMPLETE);
             }
@@ -307,7 +307,7 @@ public class TaskServiceImpl implements TaskService {
         TaskExecutionLog executionLog = new TaskExecutionLog();
         String executionLogId = UUID.randomUUID().toString();
         executionLog.setId(executionLogId);
-        executionLog.setLog(logRequestBody.getLog());
+        executionLog.setMeta(ModelUtils.writeValueAsString(logRequestBody.getMeta()));
         if (null != logRequestBody.getStartDate()) {
             executionLog.setStartTime(logRequestBody.getStartDate().getTime());
         }

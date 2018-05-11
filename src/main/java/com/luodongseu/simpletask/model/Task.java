@@ -34,9 +34,9 @@ public class Task {
     private String description;
 
     /**
-     * 任务详细信息说明，与@description字段可以联合使用或仅用其中一个
+     * 任务详细信息说明，一般存放json数据
      */
-    private String detail;
+    private String meta;
 
     /**
      * 执行体信息，一般用于帮助第三方服务记录该任务关联的其他模型

@@ -1,11 +1,13 @@
 package com.luodongseu.simpletask.service.impl;
 
+import com.luodongseu.simpletask.bean.TaskResponse;
 import com.luodongseu.simpletask.enums.StatusEnum;
 import com.luodongseu.simpletask.model.Task;
 import com.luodongseu.simpletask.model.Task_;
 import com.luodongseu.simpletask.service.TaskCheckerService;
 import com.luodongseu.simpletask.service.TaskService;
 import com.luodongseu.simpletask.utils.NoteUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.domain.Specification;
@@ -21,6 +23,7 @@ import java.util.List;
 /**
  * @author luodongseu
  */
+@Slf4j
 @Service
 public class TaskCheckerServiceImpl implements TaskCheckerService {
 
@@ -34,6 +37,7 @@ public class TaskCheckerServiceImpl implements TaskCheckerService {
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void checkTaskEndTime() {
+        log.info(">>>>>> Start to check all expired end time tasks...");
         List<Specification<Task>> specifications = new ArrayList<>();
         Specification<Task> statusSpec = (Root<Task> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder
                 criteriaBuilder) ->
@@ -43,18 +47,21 @@ public class TaskCheckerServiceImpl implements TaskCheckerService {
         Specification<Task> enTimeSpec = (Root<Task> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder
                 criteriaBuilder) -> {
             criteriaQuery.orderBy(criteriaBuilder.asc(root.get(Task_.endTime)));
-            return criteriaBuilder.lessThanOrEqualTo(root.get(Task_.endTime), System.currentTimeMillis());
+            return criteriaBuilder.and(criteriaBuilder.greaterThanOrEqualTo(root.get(Task_.endTime), 0L),
+                    criteriaBuilder.lessThanOrEqualTo(root.get(Task_.endTime), System.currentTimeMillis()));
         };
         specifications.add(enTimeSpec);
-        Page<Task> notEndTasks = taskService.queryAllTask(specifications, null);
+        Page<TaskResponse> notEndTasks = taskService.queryAllTask(specifications, null);
         if (notEndTasks.getTotalElements() >= 1 && notEndTasks.getContent().size() >= 1) {
             notEndTasks.getContent().forEach(task -> taskService.endTask(task.getId(), NoteUtils.getSystemNote("End task")));
         }
+        log.info(">>>>>> This time success update {} tasks' status to end.", notEndTasks.getTotalElements());
     }
 
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void checkTaskStartTime() {
+        log.info(">>>>>> Start to check all expired start time tasks...");
         List<Specification<Task>> specifications = new ArrayList<>();
         Specification<Task> statusSpec = (Root<Task> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder
                 criteriaBuilder) ->
@@ -66,10 +73,11 @@ public class TaskCheckerServiceImpl implements TaskCheckerService {
             return criteriaBuilder.lessThanOrEqualTo(root.get(Task_.startTime), System.currentTimeMillis());
         };
         specifications.add(enTimeSpec);
-        Page<Task> notStartTasks = taskService.queryAllTask(specifications, null);
+        Page<TaskResponse> notStartTasks = taskService.queryAllTask(specifications, null);
         if (notStartTasks.getTotalElements() >= 1 && notStartTasks.getContent().size() >= 1) {
             notStartTasks.getContent().forEach(task -> taskService.startTask(task.getId(), NoteUtils.getSystemNote("Start task")));
         }
+        log.info(">>>>>> This time success update {} tasks' status to start.", notStartTasks.getTotalElements());
     }
 
 }

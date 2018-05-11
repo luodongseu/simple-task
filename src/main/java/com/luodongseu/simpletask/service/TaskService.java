@@ -1,8 +1,6 @@
 package com.luodongseu.simpletask.service;
 
-import com.luodongseu.simpletask.bean.ExecutionLogRequest;
-import com.luodongseu.simpletask.bean.TaskRequest;
-import com.luodongseu.simpletask.bean.TaskRewardTemplateRequest;
+import com.luodongseu.simpletask.bean.*;
 import com.luodongseu.simpletask.enums.ClaimCategoryEnum;
 import com.luodongseu.simpletask.model.*;
 import org.springframework.data.domain.Page;
@@ -12,6 +10,7 @@ import org.springframework.lang.Nullable;
 
 import javax.validation.constraints.NotNull;
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -36,7 +35,7 @@ public interface TaskService {
      * @param pageable       页码
      * @return Page<TaskRewardTemplate>
      */
-    Page<TaskRewardTemplate> queryAllRewardTemplate(@Nullable List<Specification<TaskRewardTemplate>> specifications, @Nullable Pageable pageable);
+    Page<TaskRewardTemplateResponse> queryAllRewardTemplate(@Nullable List<Specification<TaskRewardTemplate>> specifications, @Nullable Pageable pageable);
 
     /**
      * 保存Task内容
@@ -58,7 +57,7 @@ public interface TaskService {
      *
      * @return 全部的任务列表
      */
-    Page<Task> queryAllTask(@Nullable Pageable pageable);
+    Page<TaskResponse> queryAllTask(@Nullable Pageable pageable);
 
     /**
      * 查询所有符合条件的任务
@@ -67,7 +66,7 @@ public interface TaskService {
      * @param pageable       页码信息
      * @return 符合条件的任务
      */
-    Page<Task> queryAllTask(@Nullable List<Specification<Task>> specifications, @Nullable Pageable pageable);
+    Page<TaskResponse> queryAllTask(@Nullable List<Specification<Task>> specifications, @Nullable Pageable pageable);
 
     /**
      * 更新一个任务的信息
@@ -160,14 +159,14 @@ public interface TaskService {
     void saveTaskClaim(@NotNull TaskClaim taskClaim);
 
     /**
-     * 更新认领记录的进度
+     * 更新认领记录的元数据
      *
      * @param taskClaimId 认领表的ID
-     * @param newProgress 新的进度信息
+     * @param newMeta     新的元数据信息
      * @param completed   是否已完成
      * @return true:更新成功 false:更新失败
      */
-    boolean updateClaimProgress(@NotNull String taskClaimId, String newProgress, boolean completed);
+    boolean updateClaimProgress(@NotNull String taskClaimId, Map<String, Object> newMeta, boolean completed);
 
     /**
      * 查询指定条件的所有认领记录

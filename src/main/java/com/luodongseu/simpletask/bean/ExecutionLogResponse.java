@@ -1,9 +1,12 @@
 package com.luodongseu.simpletask.bean;
 
+import com.luodongseu.simpletask.model.Note;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -13,17 +16,8 @@ import java.util.Map;
  */
 @Getter
 @Setter
-public class ExecutionLogRequest {
-
-    /**
-     * 任务认领模型ID
-     */
-    private String taskClaimId;
-
-    /**
-     * 当前的备注
-     */
-    private String note;
+public class ExecutionLogResponse {
+    private String id;
 
     /**
      * 开始时间
@@ -41,7 +35,12 @@ public class ExecutionLogRequest {
     private Map<String, Object> meta;
 
     /**
-     * 是否完成
+     * 任务认领信息
      */
-    private boolean complete;
+    private TaskClaimResponse taskClaim;
+
+    /**
+     * 备注信息
+     */
+    private List<Note> notes = new ArrayList<>();
 }
