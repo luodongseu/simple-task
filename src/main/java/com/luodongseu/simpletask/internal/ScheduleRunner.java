@@ -21,7 +21,7 @@ public class ScheduleRunner {
     }
 
     /**
-     * 定时（启动后延迟60秒，每隔5秒执行一次）执行
+     * 定时（启动后延迟60秒，每隔30秒执行一次）执行
      */
     @Scheduled(initialDelay = 60000, fixedDelay = 30000)
     public void run() {
