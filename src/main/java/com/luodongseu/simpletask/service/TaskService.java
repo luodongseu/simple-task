@@ -130,7 +130,7 @@ public interface TaskService {
      * @param pageable       页码
      * @return Page<TaskWhiteList>
      */
-    Page<TaskWhiteList> queryAllTaskWhiteList(@Nullable List<Specification<TaskWhiteList>> specifications, @Nullable Pageable pageable);
+    Page<TaskWhiteListResponse> queryAllTaskWhiteList(@Nullable List<Specification<TaskWhiteList>> specifications, @Nullable Pageable pageable);
 
     /**
      * 从白名单中移除指定的元数据

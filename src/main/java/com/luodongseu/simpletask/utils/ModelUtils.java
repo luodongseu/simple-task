@@ -6,9 +6,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luodongseu.simpletask.bean.NoteResponse;
 import com.luodongseu.simpletask.bean.TaskResponse;
 import com.luodongseu.simpletask.bean.TaskRewardTemplateResponse;
+import com.luodongseu.simpletask.bean.TaskWhiteListResponse;
 import com.luodongseu.simpletask.model.Note;
 import com.luodongseu.simpletask.model.Task;
 import com.luodongseu.simpletask.model.TaskRewardTemplate;
+import com.luodongseu.simpletask.model.TaskWhiteList;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.BeanUtils;
@@ -86,10 +88,29 @@ public class ModelUtils {
     }
 
     /**
+     * 任务白名单模型转响应体
+     *
+     * @param whiteList 任务白名单模型
+     * @return TaskWhiteListResponse
+     */
+    public static TaskWhiteListResponse convertToResponse(TaskWhiteList whiteList) {
+        if (whiteList == null) {
+            return null;
+        }
+        TaskWhiteListResponse whiteListResponse = new TaskWhiteListResponse();
+        BeanUtils.copyProperties(whiteList, whiteListResponse);
+        if (whiteList.getCreateTime() > 0) {
+            whiteListResponse.setCreateTime(new Date(whiteList.getCreateTime()));
+        }
+        whiteListResponse.setTask(convertToResponse(whiteList.getTask()));
+        return whiteListResponse;
+    }
+
+    /**
      * 任务模型集合转响应体集合
      *
      * @param tasks 任务表模型集合
-     * @return TaskResponse
+     * @return List<TaskResponse>
      */
     public static List<TaskResponse> convertToTaskResponse(List<Task> tasks) {
         if (tasks == null || tasks.size() == 0) {
@@ -122,7 +143,7 @@ public class ModelUtils {
      * 任务模型集合转响应体集合
      *
      * @param rewardTemplates 任务表模型集合
-     * @return TaskResponse
+     * @return List<TaskRewardTemplateResponse>
      */
     public static List<TaskRewardTemplateResponse> convertToRewardResponse(List<TaskRewardTemplate> rewardTemplates) {
         if (rewardTemplates == null || rewardTemplates.size() == 0) {
@@ -130,6 +151,20 @@ public class ModelUtils {
         }
         return rewardTemplates.stream().map(ModelUtils::convertToResponse).collect(Collectors.toList());
     }
+
+    /**
+     * 任务白名单集合转响应体集合
+     *
+     * @param whiteLists 任务白名单集合
+     * @return List<TaskWhiteListResponse>
+     */
+    public static List<TaskWhiteListResponse> convertToWhiteListResponse(List<TaskWhiteList> whiteLists) {
+        if (whiteLists == null || whiteLists.size() == 0) {
+            return new ArrayList<>();
+        }
+        return whiteLists.stream().map(ModelUtils::convertToResponse).collect(Collectors.toList());
+    }
+
 
     /**
      * 备注模型转响应体

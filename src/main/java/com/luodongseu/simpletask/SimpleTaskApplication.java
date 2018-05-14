@@ -2,6 +2,7 @@ package com.luodongseu.simpletask;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -10,7 +11,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * @author luodongseu
  */
 @EnableScheduling
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "com.luodongseu.simpletask")
+@EntityScan
 public class SimpleTaskApplication {
 
     public static void main(String[] args) {

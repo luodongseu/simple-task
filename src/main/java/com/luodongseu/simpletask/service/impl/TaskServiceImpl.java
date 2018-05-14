@@ -25,6 +25,7 @@ import org.springframework.util.StringUtils;
 
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Join;
 import javax.persistence.criteria.Root;
 import javax.validation.constraints.NotNull;
 import java.util.*;
@@ -105,6 +106,8 @@ public class TaskServiceImpl implements TaskService {
         BeanUtils.copyProperties(task, newTask);
         newTask.setNotes(NoteUtils.addNote(newTask.getNotes(), "[System note] New task", taskId));
         taskRepository.save(newTask);
+        // 白名单
+        addTaskWhiteList(taskId, task.getWhiteList());
         return taskId;
     }
 
@@ -220,8 +223,12 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public Page<TaskWhiteList> queryAllTaskWhiteList(List<Specification<TaskWhiteList>> specifications, Pageable pageable) {
-        return SpecificationUtils.getPageData(whiteListRepository, specifications, pageable);
+    public Page<TaskWhiteListResponse> queryAllTaskWhiteList(List<Specification<TaskWhiteList>> specifications, Pageable pageable) {
+        Page<TaskWhiteList> whiteLists = SpecificationUtils.getPageData(whiteListRepository, specifications, pageable);
+        return new PageImpl<>(
+                ModelUtils.convertToWhiteListResponse(whiteLists.getContent()),
+                pageable,
+                whiteLists.getTotalElements());
     }
 
     @Override
@@ -229,9 +236,12 @@ public class TaskServiceImpl implements TaskService {
         ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
         ObjectUtils.requireNonEmpty(whiteMeta, "白名单名单不能为空");
 
-        Specification<TaskWhiteList> specifications = (Root<TaskWhiteList> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) ->
-                criteriaBuilder.and(criteriaBuilder.equal(root.get(TaskWhiteList_.taskId), taskId),
-                        criteriaBuilder.equal(root.get(TaskWhiteList_.claimer), whiteMeta));
+        Specification<TaskWhiteList> specifications = (Root<TaskWhiteList> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) -> {
+            Join<TaskWhiteList, Task> taskJoin = root.join(TaskWhiteList_.task);
+            return criteriaBuilder.and(criteriaBuilder.equal(taskJoin.get(Task_.id), taskId),
+                    criteriaBuilder.equal(root.get(TaskWhiteList_.claimer), whiteMeta));
+        };
+
         Page<TaskWhiteList> whiteLists = SpecificationUtils.getPageData(whiteListRepository, Collections.singletonList(specifications), null);
         if (whiteLists.getTotalElements() == 0) {
             return false;

@@ -10,6 +10,6 @@ import javax.persistence.metamodel.StaticMetamodel;
  */
 @StaticMetamodel(TaskWhiteList.class)
 public class TaskWhiteList_ {
-    public static volatile SingularAttribute<TaskWhiteList, String> taskId;
+    public static volatile SingularAttribute<TaskWhiteList, Task> task;
     public static volatile SingularAttribute<TaskWhiteList, String> claimer;
 }
