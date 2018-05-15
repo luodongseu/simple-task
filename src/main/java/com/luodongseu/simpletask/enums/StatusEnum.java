@@ -34,5 +34,10 @@ public enum StatusEnum {
     /**
      * 无效
      */
-    INVALID
+    INVALID,
+
+    /**
+     * 已删除
+     */
+    DELETED
 }

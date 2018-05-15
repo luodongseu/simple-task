@@ -1,7 +1,6 @@
 package com.luodongseu.simpletask.service;
 
 import com.luodongseu.simpletask.bean.*;
-import com.luodongseu.simpletask.enums.ClaimCategoryEnum;
 import com.luodongseu.simpletask.model.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -111,7 +110,7 @@ public interface TaskService {
      * @param taskId 任务ID
      * @return true:删除成功 false:删除失败
      */
-    boolean deleteTask(@NotNull String taskId);
+    boolean deleteTask(@NotNull String taskId, String note);
 
 
     /**
@@ -144,12 +143,11 @@ public interface TaskService {
     /**
      * 认领一个任务， 认领后会在任务的备注表中添加相应的认领记录
      *
-     * @param taskId   任务ID
-     * @param claimer  认领者
-     * @param category 认领类别
+     * @param taskId       任务ID
+     * @param claimRequest 认领信息
      * @return 认领的记录ID
      */
-    String claimTask(@NotNull String taskId, String claimer, ClaimCategoryEnum category);
+    String claimTask(@NotNull String taskId, @NotNull TaskClaimRequest claimRequest);
 
     /**
      * 保存一个认领对象
@@ -157,6 +155,22 @@ public interface TaskService {
      * @param taskClaim 任务认领对象
      */
     void saveTaskClaim(@NotNull TaskClaim taskClaim);
+
+    /**
+     * 开始认领任务
+     *
+     * @param taskId 任务ID
+     * @return true: 取消成功 false:取消失败
+     */
+    boolean startTaskClaim(@NotNull String taskId, String note);
+
+    /**
+     * 取消一个认领
+     *
+     * @param taskId 任务ID
+     * @return true: 取消成功 false:取消失败
+     */
+    boolean cancelTaskClaim(@NotNull String taskId, String note);
 
     /**
      * 更新认领记录的元数据
@@ -175,7 +189,7 @@ public interface TaskService {
      * @param pageable       页码信息
      * @return 认领记录列表
      */
-    Page<TaskClaim> queryAllClaims(@Nullable List<Specification<TaskClaim>> specifications, @Nullable Pageable pageable);
+    Page<TaskClaimResponse> queryAllClaims(@Nullable List<Specification<TaskClaim>> specifications, @Nullable Pageable pageable);
 
     /**
      * 添加执行日志
@@ -199,5 +213,5 @@ public interface TaskService {
      * @param pageable       页码信息
      * @return 执行日志列表
      */
-    Page<TaskExecutionLog> queryAllLogs(@Nullable List<Specification<TaskExecutionLog>> specifications, @Nullable Pageable pageable);
+    Page<ExecutionLogResponse> queryAllLogs(@Nullable List<Specification<TaskExecutionLog>> specifications, @Nullable Pageable pageable);
 }

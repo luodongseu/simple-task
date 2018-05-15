@@ -1,6 +1,7 @@
 package com.luodongseu.simpletask.bean;
 
-import com.luodongseu.simpletask.model.Note;
+import com.luodongseu.simpletask.enums.ClaimCategoryEnum;
+import com.luodongseu.simpletask.enums.StatusEnum;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -32,7 +33,7 @@ public class TaskClaimResponse {
     /**
      * 类别
      */
-    private String category;
+    private ClaimCategoryEnum category;
 
     /**
      * 元数据，可以自定义json
@@ -45,7 +46,12 @@ public class TaskClaimResponse {
     private Date createTime;
 
     /**
+     * 任务认领状态
+     */
+    private StatusEnum status;
+
+    /**
      * 备注信息
      */
-    private List<Note> notes = new ArrayList<>();
+    private List<NoteResponse> notes = new ArrayList<>();
 }

@@ -1,7 +1,6 @@
 package com.luodongseu.simpletask.service.impl;
 
 import com.luodongseu.simpletask.bean.*;
-import com.luodongseu.simpletask.enums.ClaimCategoryEnum;
 import com.luodongseu.simpletask.enums.StatusEnum;
 import com.luodongseu.simpletask.exception.ErrorCode;
 import com.luodongseu.simpletask.exception.GlobalException;
@@ -80,7 +79,9 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public void saveTask(Task task) {
-        assert !StringUtils.isEmpty(task.getId());
+        ObjectUtils.requireNonEmpty(task, Objects::isNull, "任务不能为空");
+        ObjectUtils.requireNonEmpty(task.getId(), "任务ID不能为空");
+
         this.taskRepository.save(task);
     }
 
@@ -89,7 +90,7 @@ public class TaskServiceImpl implements TaskService {
         ObjectUtils.requireNonEmpty(task, Objects::isNull, "任务内容不能为空");
         ObjectUtils.requireNonEmpty(task.getCreator(), "任务创建者不能为空");
         ObjectUtils.requireNonEmpty(task.getDescription(), "任务描述信息不能为空");
-        Objects.requireNonNull(task.getStartDate(), "任务起始时间不能为空");
+        ObjectUtils.requireNonEmpty(task.getStartDate(), Objects::isNull, "任务起始时间不能为空");
 
         TaskRewardTemplate rewardTemplate = StringUtils.isEmpty(task.getRewardTemplateId()) ?
                 null :
@@ -144,7 +145,7 @@ public class TaskServiceImpl implements TaskService {
             taskRepository.save(oldTask);
             return true;
         }
-        return false;
+        throw new GlobalException(ErrorCode.TASK_NOT_FOUND, "没有找到指定的任务", null);
     }
 
     @Override
@@ -153,12 +154,16 @@ public class TaskServiceImpl implements TaskService {
 
         Task oldTask = findTaskById(taskId);
         if (null != oldTask) {
+            if (StatusEnum.NOT_READY != oldTask.getStatus()) {
+                throw new GlobalException(ErrorCode.INTERNAL_ERROR, "无法开始非未开始状态的任务", taskId, null);
+            }
             oldTask.setStatus(StatusEnum.IN_PROGRESS);
             oldTask.setNotes(NoteUtils.addNote(oldTask.getNotes(), note, taskId));
+            startTaskClaim(taskId, "[System Note] Task started");
             taskRepository.save(oldTask);
             return true;
         }
-        return false;
+        throw new GlobalException(ErrorCode.TASK_NOT_FOUND, "没有找到指定的任务", null);
     }
 
     @Override
@@ -167,12 +172,16 @@ public class TaskServiceImpl implements TaskService {
 
         Task oldTask = findTaskById(taskId);
         if (null != oldTask) {
+            if (Arrays.asList(StatusEnum.CANCELED, StatusEnum.INVALID, StatusEnum.END, StatusEnum.COMPLETE, StatusEnum.DELETED).contains(oldTask.getStatus())) {
+                throw new GlobalException(ErrorCode.INTERNAL_ERROR, "无法取消已结束的任务", taskId, null);
+            }
             oldTask.setStatus(StatusEnum.CANCELED);
             oldTask.setNotes(NoteUtils.addNote(oldTask.getNotes(), note, taskId));
+            cancelTaskClaim(taskId, "[System Note] Task canceled");
             taskRepository.save(oldTask);
             return true;
         }
-        return false;
+        throw new GlobalException(ErrorCode.TASK_NOT_FOUND, "没有找到指定的任务", null);
     }
 
     @Override
@@ -181,23 +190,35 @@ public class TaskServiceImpl implements TaskService {
 
         Task oldTask = findTaskById(taskId);
         if (null != oldTask) {
+            if (Arrays.asList(StatusEnum.CANCELED, StatusEnum.INVALID, StatusEnum.END, StatusEnum.COMPLETE, StatusEnum.DELETED).contains(oldTask.getStatus())) {
+                throw new GlobalException(ErrorCode.INTERNAL_ERROR, "无法结束已经结束的任务", taskId, null);
+            }
             oldTask.setStatus(StatusEnum.END);
             oldTask.setNotes(NoteUtils.addNote(oldTask.getNotes(), note, taskId));
+            cancelTaskClaim(taskId, "[System Note] Task ended");
             taskRepository.save(oldTask);
             return true;
         }
-        return false;
+        throw new GlobalException(ErrorCode.TASK_NOT_FOUND, "没有找到指定的任务", null);
     }
 
+
     @Override
-    public boolean deleteTask(String taskId) {
+    public boolean deleteTask(String taskId, String note) {
         ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
 
         Task oldTask = findTaskById(taskId);
         if (null != oldTask) {
-            taskRepository.delete(oldTask);
+            if (StatusEnum.DELETED == oldTask.getStatus()) {
+                throw new GlobalException(ErrorCode.INTERNAL_ERROR, "无法删除已经删除的任务", taskId, null);
+            }
+            oldTask.setStatus(StatusEnum.DELETED);
+            oldTask.setNotes(NoteUtils.addNote(oldTask.getNotes(), note, taskId));
+            cancelTaskClaim(taskId, "[System Note] Task deleted");
+            taskRepository.save(oldTask);
+            return true;
         }
-        return true;
+        throw new GlobalException(ErrorCode.TASK_NOT_FOUND, "没有找到指定的任务", null);
     }
 
     @Override
@@ -251,10 +272,10 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public String claimTask(String taskId, String claimer, ClaimCategoryEnum category) {
+    public String claimTask(String taskId, TaskClaimRequest claimRequest) {
         ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
-        ObjectUtils.requireNonEmpty(claimer, "认领者不能为空");
-        ObjectUtils.requireNonEmpty(category, Objects::isNull, "认领者不能为空");
+        ObjectUtils.requireNonEmpty(claimRequest.getClaimer(), "认领者不能为空");
+        ObjectUtils.requireNonEmpty(claimRequest.getCategory(), Objects::isNull, "认领类别不能为空");
 
         Task task = findTaskById(taskId);
         if (null == task) {
@@ -263,9 +284,9 @@ public class TaskServiceImpl implements TaskService {
         TaskClaim newClaim = new TaskClaim();
         String claimId = UUID.randomUUID().toString();
         newClaim.setId(claimId);
-        newClaim.setCategory(category);
-        newClaim.setClaimer(claimer);
-        newClaim.setStatus(StatusEnum.IN_PROGRESS);
+        newClaim.setCategory(claimRequest.getCategory());
+        newClaim.setClaimer(claimRequest.getClaimer());
+        newClaim.setStatus(StatusEnum.NOT_READY);
         newClaim.setTask(task);
         newClaim.setNotes(NoteUtils.addNote(newClaim.getNotes(), "[System note] New claim", claimId));
         return taskClaimRepository.save(newClaim).getId();
@@ -278,6 +299,40 @@ public class TaskServiceImpl implements TaskService {
         ObjectUtils.requireNonEmpty(taskClaim.getClaimer(), "认领者不能为空");
 
         taskClaimRepository.save(taskClaim);
+    }
+
+    @Override
+    public boolean startTaskClaim(@NotNull String taskId, String note) {
+        Specification<TaskClaim> specification = (Root<TaskClaim> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) -> {
+            Join<TaskClaim, Task> taskJoin = root.join(TaskClaim_.task);
+            return criteriaBuilder.equal(taskJoin.get(Task_.id), taskId);
+        };
+        List<TaskClaim> claimList = taskClaimRepository.findAll(specification);
+        claimList.forEach(c -> {
+            if (StatusEnum.IN_PROGRESS == c.getStatus()) {
+                c.setStatus(StatusEnum.IN_PROGRESS);
+                c.setNotes(NoteUtils.addNote(c.getNotes(), note, taskId));
+            }
+        });
+        taskClaimRepository.saveAll(claimList);
+        return true;
+    }
+
+    @Override
+    public boolean cancelTaskClaim(@NotNull String taskId, String note) {
+        Specification<TaskClaim> specification = (Root<TaskClaim> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) -> {
+            Join<TaskClaim, Task> taskJoin = root.join(TaskClaim_.task);
+            return criteriaBuilder.equal(taskJoin.get(Task_.id), taskId);
+        };
+        List<TaskClaim> claimList = taskClaimRepository.findAll(specification);
+        claimList.forEach(c -> {
+            if (StatusEnum.IN_PROGRESS == c.getStatus()) {
+                c.setStatus(StatusEnum.INVALID);
+                c.setNotes(NoteUtils.addNote(c.getNotes(), note, taskId));
+            }
+        });
+        taskClaimRepository.saveAll(claimList);
+        return true;
     }
 
     @Override
@@ -300,8 +355,13 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public Page<TaskClaim> queryAllClaims(List<Specification<TaskClaim>> specifications, Pageable pageable) {
-        return SpecificationUtils.getPageData(taskClaimRepository, specifications, pageable);
+    public Page<TaskClaimResponse> queryAllClaims(List<Specification<TaskClaim>> specifications, Pageable pageable) {
+        Page<TaskClaim> claims = SpecificationUtils.getPageData(taskClaimRepository, specifications, pageable);
+        return new PageImpl<>(
+                ModelUtils.convertToClaimResponse(claims.getContent()),
+                pageable,
+                claims.getTotalElements()
+        );
     }
 
     @Override
@@ -338,8 +398,13 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public Page<TaskExecutionLog> queryAllLogs(List<Specification<TaskExecutionLog>> specifications, Pageable pageable) {
-        return SpecificationUtils.getPageData(taskExecutionLogRepository, specifications, pageable);
+    public Page<ExecutionLogResponse> queryAllLogs(List<Specification<TaskExecutionLog>> specifications, Pageable pageable) {
+        Page<TaskExecutionLog> logs = SpecificationUtils.getPageData(taskExecutionLogRepository, specifications, pageable);
+        return new PageImpl<>(
+                ModelUtils.convertToLogResponse(logs.getContent()),
+                pageable,
+                logs.getTotalElements()
+        );
     }
 
     /**

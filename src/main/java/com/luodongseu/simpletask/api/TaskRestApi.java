@@ -1,12 +1,10 @@
 package com.luodongseu.simpletask.api;
 
-import com.luodongseu.simpletask.bean.TaskRequest;
-import com.luodongseu.simpletask.bean.TaskResponse;
-import com.luodongseu.simpletask.bean.TaskWhiteListResponse;
-import com.luodongseu.simpletask.model.Task;
-import com.luodongseu.simpletask.model.TaskWhiteList;
-import com.luodongseu.simpletask.model.TaskWhiteList_;
-import com.luodongseu.simpletask.model.Task_;
+import com.luodongseu.simpletask.bean.*;
+import com.luodongseu.simpletask.enums.ClaimCategoryEnum;
+import com.luodongseu.simpletask.exception.ErrorCode;
+import com.luodongseu.simpletask.exception.GlobalException;
+import com.luodongseu.simpletask.model.*;
 import com.luodongseu.simpletask.service.TaskService;
 import com.luodongseu.simpletask.utils.ObjectUtils;
 import com.luodongseu.simpletask.utils.PageUtils;
@@ -55,6 +53,19 @@ public class TaskRestApi {
         return taskService.createNewTask(body);
     }
 
+    @ApiOperation("更新一个任务")
+    @ApiImplicitParam(name = "taskId", value = "任务ID", required = true, paramType = "path", type = "String")
+    @PostMapping("/{taskId}")
+    public boolean createOneNewTask(@PathVariable("taskId") String taskId, @RequestBody TaskRequest body) {
+        log.info("New a task: {}", body);
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
+        if (null == body.getStartDate()) {
+            body.setStartDate(new Date());
+        }
+        return taskService.updateTask(taskId, body);
+    }
+
     @ApiOperation("条件查询所有的任务")
     @ApiImplicitParams({
             @ApiImplicitParam(name = "offset", value = "页码值，从0开始", defaultValue = "0", paramType = "query", type = "int", example = "0"),
@@ -64,10 +75,14 @@ public class TaskRestApi {
     @GetMapping
     public Page<TaskResponse> queryAllTask(@RequestParam(value = "offset", defaultValue = "0") int offset,
                                            @RequestParam(value = "limit", defaultValue = "10") int limit,
-                                           @RequestParam(value = "creator", required = false) String creator) {
+                                           @RequestParam(value = "creator", required = false) String creator,
+                                           @RequestParam(value = "status", required = false) String status) {
         List<Specification<Task>> querySpecs = new ArrayList<>();
         if (!StringUtils.isEmpty(creator)) {
             querySpecs.add((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get(Task_.creator), creator));
+        }
+        if (!StringUtils.isEmpty(status)) {
+            querySpecs.add((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get(Task_.status), status));
         }
         return taskService.queryAllTask(querySpecs, PageUtils.loadPage(offset, limit));
     }
@@ -84,6 +99,58 @@ public class TaskRestApi {
         return tasks.getTotalElements() > 0 ? tasks.getContent().get(0) : null;
     }
 
+    @ApiOperation("将指定ID的任务设置为已开始")
+    @ApiImplicitParam(name = "taskId", value = "任务ID", required = true, paramType = "path", type = "String")
+    @PostMapping("/{taskId}/start")
+    public void startTask(@PathVariable("taskId") String taskId, @RequestBody(required = false) String note) {
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
+        boolean startResult = taskService.startTask(taskId,
+                StringUtils.isEmpty(note) ? "[System Note] User started" : "[User Start] " + note);
+        if (!startResult) {
+            throw new GlobalException(ErrorCode.UNKNOWN_ERROR, "Start task " + taskId + " failed!", null);
+        }
+    }
+
+    @ApiOperation("取消指定ID的任务")
+    @ApiImplicitParam(name = "taskId", value = "任务ID", required = true, paramType = "path", type = "String")
+    @PostMapping("/{taskId}/cancel")
+    public void cancelTask(@PathVariable("taskId") String taskId, @RequestBody(required = false) String note) {
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
+        boolean startResult = taskService.cancelTask(taskId,
+                StringUtils.isEmpty(note) ? "[System Note] User canceled" : "[User Cancel] " + note);
+        if (!startResult) {
+            throw new GlobalException(ErrorCode.UNKNOWN_ERROR, "Start task " + taskId + " failed!", null);
+        }
+    }
+
+    @ApiOperation("将指定ID的任务设置为已结束")
+    @ApiImplicitParam(name = "taskId", value = "任务ID", required = true, paramType = "path", type = "String")
+    @PostMapping("/{taskId}/end")
+    public void endTask(@PathVariable("taskId") String taskId, @RequestBody(required = false) String note) {
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
+        boolean startResult = taskService.endTask(taskId,
+                StringUtils.isEmpty(note) ? "[System Note] User ended" : "[User End] " + note);
+        if (!startResult) {
+            throw new GlobalException(ErrorCode.UNKNOWN_ERROR, "Start task " + taskId + " failed!", null);
+        }
+    }
+
+    @ApiOperation("删除指定ID的任务")
+    @ApiImplicitParam(name = "taskId", value = "任务ID", required = true, paramType = "path", type = "String")
+    @DeleteMapping("/{taskId}")
+    public void deleteTask(@PathVariable("taskId") String taskId, @RequestBody(required = false) String note) {
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
+        boolean startResult = taskService.deleteTask(taskId,
+                StringUtils.isEmpty(note) ? "[System Note] User deleted" : "[User Delete] " + note);
+        if (!startResult) {
+            throw new GlobalException(ErrorCode.UNKNOWN_ERROR, "Start task " + taskId + " failed!", null);
+        }
+    }
+
     @ApiOperation("获取指定ID的任务的白名单")
     @ApiImplicitParam(name = "taskId", value = "任务ID", required = true, paramType = "path", type = "String")
     @GetMapping("/{taskId}/whitelist")
@@ -98,4 +165,60 @@ public class TaskRestApi {
         };
         return taskService.queryAllTaskWhiteList(Collections.singletonList(taskSpec), PageUtils.loadPage(offset, limit));
     }
+
+    @ApiOperation("主动认领指定的任务")
+    @ApiImplicitParam(name = "taskId", value = "任务ID", required = true, paramType = "path", type = "String")
+    @ApiResponse(code = 200, message = "执行记录的ID")
+    @PostMapping("/{taskId}/claim/apply")
+    public String applyClaimTask(@PathVariable("taskId") String taskId, @RequestBody TaskClaimRequest claimRequest) {
+        ObjectUtils.requireNonEmpty(taskId, "认领ID不能为空");
+        ObjectUtils.requireNonEmpty(claimRequest, Objects::isNull, "认领信息不能为空");
+        ObjectUtils.requireNonEmpty(claimRequest.getClaimer(), "认领者不能为空");
+
+        claimRequest.setCategory(ClaimCategoryEnum.APPLIED);
+        return taskService.claimTask(taskId, claimRequest);
+    }
+
+    @ApiOperation("获取指定ID的任务的认领者信息")
+    @ApiImplicitParam(name = "taskId", value = "任务ID", required = true, paramType = "path", type = "String")
+    @GetMapping("/{taskId}/claims")
+    public Page<TaskClaimResponse> queryAllClaimList(@PathVariable("taskId") String taskId,
+                                                     @RequestParam(value = "offset", defaultValue = "0") int offset,
+                                                     @RequestParam(value = "limit", defaultValue = "10") int limit) {
+        ObjectUtils.requireNonEmpty(taskId, "任务ID不能为空");
+
+        Specification<TaskClaim> claimSpec = (Root<TaskClaim> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) -> {
+            Join<TaskClaim, Task> taskJoin = root.join(TaskClaim_.task);
+            return criteriaBuilder.equal(taskJoin.get(Task_.id), taskId);
+        };
+        return taskService.queryAllClaims(Collections.singletonList(claimSpec), PageUtils.loadPage(offset, limit));
+    }
+
+    @ApiOperation("获取指定ID的任务的执行记录")
+    @ApiImplicitParam(name = "taskClaimId", value = "任务认领ID", required = true, paramType = "path", type = "String")
+    @GetMapping("/{taskClaimId}/executions")
+    public Page<ExecutionLogResponse> queryAllExecutionLogList(@PathVariable("taskClaimId") String taskClaimId,
+                                                               @RequestParam(value = "offset", defaultValue = "0") int offset,
+                                                               @RequestParam(value = "limit", defaultValue = "10") int limit) {
+        ObjectUtils.requireNonEmpty(taskClaimId, "认领ID不能为空");
+
+        Specification<TaskExecutionLog> claimSpec = (Root<TaskExecutionLog> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) -> {
+            Join<TaskExecutionLog, TaskClaim> taskJoin = root.join(TaskExecutionLog_.taskClaim);
+            return criteriaBuilder.equal(taskJoin.get(TaskClaim_.id), taskClaimId);
+        };
+        return taskService.queryAllLogs(Collections.singletonList(claimSpec), PageUtils.loadPage(offset, limit));
+    }
+
+    @ApiOperation("添加执行记录")
+    @ApiImplicitParam(name = "taskClaimId", value = "任务认领ID", required = true, paramType = "path", type = "String")
+    @ApiResponse(code = 200, message = "执行记录的ID")
+    @PostMapping("/claim/{taskClaimId}/execution")
+    public String executeTask(@PathVariable("taskClaimId") String taskClaimId,
+                              @RequestBody ExecutionLogRequest logRequest) {
+        ObjectUtils.requireNonEmpty(taskClaimId, "认领ID不能为空");
+        ObjectUtils.requireNonEmpty(logRequest, Objects::isNull, "认领信息不能为空");
+
+        return taskService.addExecutionLog(logRequest);
+    }
+
 }

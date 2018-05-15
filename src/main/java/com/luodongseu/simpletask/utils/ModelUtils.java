@@ -3,14 +3,8 @@ package com.luodongseu.simpletask.utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.luodongseu.simpletask.bean.NoteResponse;
-import com.luodongseu.simpletask.bean.TaskResponse;
-import com.luodongseu.simpletask.bean.TaskRewardTemplateResponse;
-import com.luodongseu.simpletask.bean.TaskWhiteListResponse;
-import com.luodongseu.simpletask.model.Note;
-import com.luodongseu.simpletask.model.Task;
-import com.luodongseu.simpletask.model.TaskRewardTemplate;
-import com.luodongseu.simpletask.model.TaskWhiteList;
+import com.luodongseu.simpletask.bean.*;
+import com.luodongseu.simpletask.model.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.BeanUtils;
@@ -167,6 +161,89 @@ public class ModelUtils {
 
 
     /**
+     * 认领模型转响应体
+     *
+     * @param claim 认领模型
+     * @return TaskClaimResponse
+     */
+    public static TaskClaimResponse convertToResponse(TaskClaim claim) {
+        if (claim == null) {
+            return null;
+        }
+        TaskClaimResponse taskClaimResponse = new TaskClaimResponse();
+        BeanUtils.copyProperties(claim, taskClaimResponse);
+        if (claim.getCreateTime() > 0) {
+            taskClaimResponse.setCreateTime(new Date(claim.getCreateTime()));
+        }
+        taskClaimResponse.setTask(convertToResponse(claim.getTask()));
+        try {
+            taskClaimResponse.setMeta(JSON_MAPPER.readValue(claim.getMeta(), MAP_REFERENCE));
+        } catch (IOException e) {
+            taskClaimResponse.setMeta(new HashMap<>(0));
+        }
+        taskClaimResponse.setNotes(convertToNoteResponse(claim.getNotes()));
+        return taskClaimResponse;
+    }
+
+    /**
+     * 认领模型集合转响应体集合
+     *
+     * @param claims 认领表模型集合
+     * @return List<TaskClaimResponse>
+     */
+    public static List<TaskClaimResponse> convertToClaimResponse(List<TaskClaim> claims) {
+        if (claims == null || claims.size() == 0) {
+            return new ArrayList<>();
+        }
+        return claims.stream().map(ModelUtils::convertToResponse).collect(Collectors.toList());
+    }
+
+    /**
+     * 执行日志模型转响应体
+     *
+     * @param log 执行日志模型
+     * @return ExecutionLogResponse
+     */
+    public static ExecutionLogResponse convertToResponse(TaskExecutionLog log) {
+        if (log == null) {
+            return null;
+        }
+        ExecutionLogResponse executionLogResponse = new ExecutionLogResponse();
+        BeanUtils.copyProperties(log, executionLogResponse);
+        if (log.getCreateTime() > 0) {
+            executionLogResponse.setCreateTime(new Date(log.getCreateTime()));
+        }
+        if (log.getStartTime() > 0) {
+            executionLogResponse.setStartDate(new Date(log.getStartTime()));
+        }
+        if (log.getEndTime() > 0) {
+            executionLogResponse.setEndDate(new Date(log.getEndTime()));
+        }
+        try {
+            executionLogResponse.setMeta(JSON_MAPPER.readValue(log.getMeta(), MAP_REFERENCE));
+        } catch (IOException e) {
+            executionLogResponse.setMeta(new HashMap<>(0));
+        }
+        executionLogResponse.setTaskClaim(convertToResponse(log.getTaskClaim()));
+        executionLogResponse.setNotes(convertToNoteResponse(log.getNotes()));
+        return executionLogResponse;
+    }
+
+    /**
+     * 执行日志模型集合转响应体集合
+     *
+     * @param logs 执行日志表模型集合
+     * @return List<ExecutionLogResponse>
+     */
+    public static List<ExecutionLogResponse> convertToLogResponse(List<TaskExecutionLog> logs) {
+        if (logs == null || logs.size() == 0) {
+            return new ArrayList<>();
+        }
+        return logs.stream().map(ModelUtils::convertToResponse).collect(Collectors.toList());
+    }
+
+
+    /**
      * 备注模型转响应体
      *
      * @param note 备注模型表模型
@@ -189,7 +266,7 @@ public class ModelUtils {
      * 备注模型集合转响应体集合
      *
      * @param notes 备注表模型集合
-     * @return TaskResponse
+     * @return List<NoteResponse>
      */
     public static List<NoteResponse> convertToNoteResponse(List<Note> notes) {
         if (notes == null || notes.size() == 0) {

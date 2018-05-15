@@ -1,6 +1,6 @@
 package com.luodongseu.simpletask.bean;
 
-import com.luodongseu.simpletask.model.Note;
+import com.luodongseu.simpletask.enums.StatusEnum;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -42,6 +42,11 @@ public class TaskResponse {
      * 任务开始时间
      */
     private Date startDate;
+
+    /**
+     * 任务状态
+     */
+    private StatusEnum status;
 
     /**
      * 任务结束时间

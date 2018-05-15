@@ -37,6 +37,11 @@ public class TaskRequest {
     private String category;
 
     /**
+     * 当前的备注
+     */
+    private String note;
+
+    /**
      * 任务开始时间
      */
     private Date startDate;
